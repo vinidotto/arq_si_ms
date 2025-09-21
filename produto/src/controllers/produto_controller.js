@@ -1,6 +1,5 @@
 const { produtoService } = require("../services/produto_service.js");
 
-// Criar produto
 async function createProduct(req, res) {
   try {
     const product = await produtoService.create(req.body);
@@ -10,7 +9,6 @@ async function createProduct(req, res) {
   }
 }
 
-// Buscar todos os produtos
 async function getAllProducts(req, res) {
   try {
     const products = await produtoService.getAll();
@@ -20,10 +18,9 @@ async function getAllProducts(req, res) {
   }
 }
 
-// Buscar produto por ID
 async function getProductById(req, res) {
   try {
-    const product = await produtoService.getById(Number(req.params.id));
+    const product = await produtoService.getById(req.params.id);
     if (!product) {
       return res.status(404).json({ message: "Product not found" });
     }
@@ -33,11 +30,10 @@ async function getProductById(req, res) {
   }
 }
 
-// Atualizar produto
 async function updateProduct(req, res) {
   try {
     const product = await produtoService.update(
-      Number(req.params.id),
+      req.params.id,
       req.body
     );
     return res.json(product);
@@ -46,22 +42,20 @@ async function updateProduct(req, res) {
   }
 }
 
-// Deletar produto (deleção virtual)
 async function deleteProduct(req, res) {
   try {
-    await produtoService.softDelete(Number(req.params.id));
+    await produtoService.softDelete(req.params.id);
     return res.status(204).send();
   } catch (error) {
     return res.status(400).json({ message: error.message });
   }
 }
 
-// Atualizar estoque
 async function updateStock(req, res) {
   try {
     const { quantity } = req.body;
     const product = await produtoService.updateStock(
-      Number(req.params.id),
+      req.params.id,
       quantity
     );
     return res.json(product);

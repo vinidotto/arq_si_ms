@@ -10,16 +10,17 @@ const produtoService = {
   },
 
   async getAll() {
-    // Retorna apenas os produtos que NÃO foram deletados
     return prisma.product.findMany({
       where: { is_deleted: false },
     });
   },
 
   async getById(id) {
-    // Retorna um produto específico apenas se NÃO foi deletado
     return prisma.product.findFirst({
-      where: { id, is_deleted: false },
+      where: {
+        id: id, 
+        is_deleted: false,
+      },
     });
   },
 
@@ -31,7 +32,6 @@ const produtoService = {
   },
 
   async softDelete(id) {
-    // Apenas marca o produto como deletado
     return prisma.product.update({
       where: { id },
       data: { is_deleted: true },
@@ -42,17 +42,14 @@ const produtoService = {
     if (typeof quantity !== "number") {
       throw new Error("Quantity must be a number");
     }
-
     const product = await this.getById(id);
     if (!product) {
       throw new Error("Product not found");
     }
-
     const newStock = product.stock + quantity;
     if (newStock < 0) {
       throw new Error("Stock cannot be negative");
     }
-
     return prisma.product.update({
       where: { id },
       data: { stock: newStock },
