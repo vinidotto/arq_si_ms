@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  # --- Serviço de Clientes ---
+  cliente-db:
+    image: postgres:15-alpine
+    container_name: cliente-db
+    restart: always
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: clientedb
+    volumes:
+      - cliente-data:/var/lib/postgresql/data
+    ports:
+      - '5433:5432' # Expondo na porta 5433 para não colidir
+
+  cliente-service:
+    container_name: cliente
+    build: ./cliente
+    restart: always
+    ports:
+      - '3001:3001'
+    environment:
+      DATABASE_URL: "postgresql://user:password@cliente-db:5432/clientedb"
+    depends_on:
+      - cliente-db
+
+  # --- Serviço de Produtos ---
+  produto-db:
+    image: postgres:15-alpine
+    container_name: produto-db
+    restart: always
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: produtodb
+    volumes:
+      - produto-data:/var/lib/postgresql/data
+    ports:
+      - '5434:5432' # Expondo na porta 5434
+
+  produto-service:
+    container_name: produto
+    build: ./produto
+    restart: always
+    ports:
+      - '3002:3002'
+    environment:
+      DATABASE_URL: "postgresql://user:password@produto-db:5432/produtodb"
+    depends_on:
+      - produto-db
+
+volumes:
+  cliente-data:
+  produto-data:
