@@ -29,6 +29,19 @@ services:
     ports:
       - '5434:5432'
 
+  pagamento-db:
+    image: postgres:15-alpine
+    container_name: pagamento-db
+    restart: always
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: pagamentodb
+    volumes:
+      - pagamento-data:/var/lib/postgresql/data
+    ports:
+      - '5435:5432'  
+
   pgadmin:
     image: dpage/pgadmin4
     container_name: pgadmin4_ecommerce
@@ -43,9 +56,11 @@ services:
     depends_on:
       - produto-db
       - cliente-db
+      - pagamento-db
 
 volumes:
   cliente-data:
   produto-data:
+  pagamento-data:
   pgadmin_data:
   
