@@ -13,18 +13,7 @@ services:
     volumes:
       - cliente-data:/var/lib/postgresql/data
     ports:
-      - '5433:5432' # Expondo na porta 5433 para não colidir
-
-  cliente-service:
-    container_name: cliente
-    build: ./cliente
-    restart: always
-    ports:
-      - '3001:3001'
-    environment:
-      DATABASE_URL: "postgresql://user:password@cliente-db:5432/clientedb"
-    depends_on:
-      - cliente-db
+      - '5433:5432'
 
   # --- Serviço de Produtos ---
   produto-db:
@@ -38,19 +27,25 @@ services:
     volumes:
       - produto-data:/var/lib/postgresql/data
     ports:
-      - '5434:5432' # Expondo na porta 5434
+      - '5434:5432'
 
-  produto-service:
-    container_name: produto
-    build: ./produto
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: pgadmin4_ecommerce
     restart: always
-    ports:
-      - '3002:3002'
     environment:
-      DATABASE_URL: "postgresql://user:password@produto-db:5432/produtodb"
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
     depends_on:
       - produto-db
+      - cliente-db
 
 volumes:
   cliente-data:
   produto-data:
+  pgadmin_data:
+  
