@@ -16,11 +16,9 @@ const orderService = {
     const productDetailPromises = data.products.map(product =>
       axios.get(`http://localhost:3002/api/products/${product.productId}`)
     );
-    console.log("TENTANDO BUSCAR PRODUTOS...");
     try {
       const productDetailResponses = await Promise.all(productDetailPromises);
       const productsFromService = productDetailResponses.map(response => response.data);
-      console.log("BUSQUEI PRODUTOS...");
 
       for (let i = 0; i < data.products.length; i++) {
         const requestedProduct = data.products[i];
@@ -33,7 +31,6 @@ const orderService = {
         if (productInStock.stock < requestedProduct.quantity) {
           throw new Error(`Estoque insuficiente para o produto: ${productInStock.name}. Disponível: ${productInStock.stock}, Solicitado: ${requestedProduct.quantity}`);
         }
-        console.log("3. Criando pedido snap...");
 
         productSnapshots.push({
           productId: productInStock.id,
@@ -44,11 +41,6 @@ const orderService = {
         calculatedTotalValue += productInStock.price * requestedProduct.quantity;
       }
 
-      const totalPaid = paymentMethods.reduce((sum, method) => sum + method.value, 0);
-      if (totalPaid.toFixed(2) !== calculatedTotalValue.toFixed(2)) {
-        throw new Error(`A soma dos pagamentos (${totalPaid}) não corresponde ao valor total do pedido (${calculatedTotalValue}).`);
-      }
-
       const orderToCreate = {
         userId: data.userId,
         totalValue: calculatedTotalValue,
@@ -57,29 +49,27 @@ const orderService = {
       };
 
       const newOrder = await prisma.order.create({ data: orderToCreate });
-      console.log("3. Criando pedido no banco de dados...");
 
-      try { // salvar a tentativa de pagamento
-        console.log("4. Registrando intenção de pagamento no serviço de pagamentos...");
+      try {
 
         const paymentCreationPromises = paymentMethods.map(method =>
           axios.post("http://localhost:3004/api/payments", {
             orderId: newOrder.id,
-            value: method.value,
+            value: calculatedTotalValue,
             typePaymentId: method.typeId
           })
         );
         await Promise.all(paymentCreationPromises);
-        console.log("-> SUCESSO: Intenção de pagamento registrada.");
-
-        console.log("--- FINALIZADO COM SUCESSO ---");
       } catch (paymentError) {
-        throw new Error(`O pedido foi criado, mas houve um erro ao registrar a intenção de pagamento: ${paymentError.message}`);
+
+        await prisma.order.delete({
+          where: { id: newOrder.id }
+        });
+
+        throw new Error(`Houve um erro ao registrar a intenção de pagamento: ${paymentError.message}`);
       }
 
-      // 5. Retornar o pedido criado
       return newOrder;
-
 
     } catch (error) {
       if (axios.isAxiosError(error)) {
@@ -109,6 +99,31 @@ const orderService = {
     const validStatus = ['AGUARDANDO_PAGAMENTO', 'FALHA_NO_PAGAMENTO', 'PAGO', 'CANCELADO'];
     if (!validStatus.includes(status)) {
       throw new Error('Invalid status value');
+    }
+
+    if (status === 'PAGO') {
+      const order = await prisma.order.findUnique({
+        where: { id: id },
+      });
+
+      if (!order) {
+        throw new Error('Pedido não encontrado para dar baixa no estoque.');
+      }
+
+      try {
+        const stockUpdatePromises = order.products.map(product =>
+          axios.patch(`http://localhost:3002/api/products/${product.productId}/stock`, {
+            quantity: -product.quantity,
+          })
+        );
+        
+        await Promise.all(stockUpdatePromises);
+        console.log(`Estoque dos produtos do pedido ${id} atualizado com sucesso.`);
+
+      } catch (error) {
+        console.error(`ERRO CRÍTICO: O pagamento do pedido ${id} foi aprovado, mas falhou ao dar baixa no estoque.`, error.message);
+        throw new Error(`Falha ao dar baixa no estoque: ${error.message}`);
+      }
     }
 
     return prisma.order.update({
