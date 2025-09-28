@@ -9,7 +9,7 @@ datasource db {
 
 model TypePayment {
   id       String         @id @default(uuid())
-  name     String         // adicionar unique depois :)
+  name     String         @unique
   payments OrderPayment[]
 
   @@map("type_payments")
