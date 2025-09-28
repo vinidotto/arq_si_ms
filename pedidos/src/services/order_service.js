@@ -14,7 +14,7 @@ const orderService = {
     let calculatedTotalValue = 0;
 
     const productDetailPromises = data.products.map(product =>
-      axios.get(`http://localhost:3002/api/products/${product.productId}`)
+      axios.get(`http://produto-service:3002/api/products/${product.productId}`)
     );
     try {
       const productDetailResponses = await Promise.all(productDetailPromises);
@@ -53,7 +53,7 @@ const orderService = {
       try {
 
         const paymentCreationPromises = paymentMethods.map(method =>
-          axios.post("http://localhost:3004/api/payments", {
+          axios.post("http://pagamentos-service:3004/api/payments", {
             orderId: newOrder.id,
             value: calculatedTotalValue,
             typePaymentId: method.typeId
@@ -112,7 +112,7 @@ const orderService = {
 
       try {
         const stockUpdatePromises = order.products.map(product =>
-          axios.patch(`http://localhost:3002/api/products/${product.productId}/stock`, {
+          axios.patch(`http://produto-service:3002/api/products/${product.productId}/stock`, {
             quantity: -product.quantity,
           })
         );
