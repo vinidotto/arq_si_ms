@@ -40,7 +40,53 @@ services:
     volumes:
       - pagamento-data:/var/lib/postgresql/data
     ports:
-      - '5435:5432'  
+      - '5435:5432'
+
+  cliente-service:
+    container_name: cliente-service
+    build: ./cliente
+    restart: always
+    ports:
+      - '3001:3001'
+    environment:
+      DATABASE_URL: "postgresql://user:password@cliente-db:5432/clientedb"
+    depends_on:
+      - cliente-db
+    command: sh -c "npx prisma migrate deploy && npm start"
+
+  produto-service:
+    container_name: produto-service
+    build: ./produto
+    restart: always
+    ports:
+      - '3002:3002'
+    environment:
+      DATABASE_URL: "postgresql://user:password@produto-db:5432/produtodb"
+    depends_on:
+      - produto-db
+    command: sh -c "npx prisma migrate deploy && npm start"
+
+  pagamentos-service:
+    container_name: pagamentos-service
+    build: ./pagamentos
+    restart: always
+    ports:
+      - '3004:3004'
+    environment:
+      DATABASE_URL: "postgresql://user:password@pagamento-db:5432/pagamentodb"
+    depends_on:
+      - pagamento-db
+    command: sh -c "npx prisma migrate deploy && npx prisma db seed && npm start"
+
+  pedidos-service:
+    container_name: pedidos-service
+    build: ./pedidos
+    restart: always
+    ports:
+      - '3003:3003'
+    env_file:
+      - ./.env
+    command: sh -c "npx prisma db push && npm start"
 
   pgadmin:
     image: dpage/pgadmin4
@@ -63,4 +109,3 @@ volumes:
   produto-data:
   pagamento-data:
   pgadmin_data:
-  
