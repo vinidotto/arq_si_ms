@@ -30,7 +30,8 @@ async function createPayment(req, res) {
 async function processPayment(req, res) {
     try {
         const { id } = req.params;
-        const payment = await paymentService.processPayment(id);
+        const data = req.body;
+        const payment = await paymentService.processPayment(id, data);
         res.status(200).json(payment);
     } catch (error) {
         res.status(400).json({ message: error.message });
