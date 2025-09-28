@@ -25,6 +25,8 @@ const paymentService = {
 
 
     async createPayment(data) {
+        console.log('DADOS RECEBIDOS NA CREATE PAYMENT:', data);
+
         const { orderId, value, typePaymentId } = data;
         if (!orderId || !value || !typePaymentId) {
             throw new Error('orderId, value e typePaymentId são obrigatórios.');
@@ -54,11 +56,20 @@ const paymentService = {
         });
     },
 
-    async processPayment(paymentId) {
+    async processPayment(paymentId, data) {
+        const { value } = data;
+        if (value === undefined) {
+            throw new Error('O campo "value" é obrigatório no corpo da requisição.');
+        }
+
         const payment = await prisma.orderPayment.findUnique({ where: { id: paymentId } });
 
         if (!payment) throw new Error(`Pagamento com ID ${paymentId} não encontrado.`);
         if (payment.status !== 'PENDENTE') throw new Error(`Este pagamento já foi processado. Status: ${payment.status}`);
+
+        if (value !== parseFloat(payment.value)) {
+            throw new Error(`O valor informado não corresponde ao valor do pedido.`);
+        }
 
         const isSuccess = Math.random() > 0.2;
         const newStatus = isSuccess ? 'APROVADO' : 'RECUSADO';
@@ -70,7 +81,7 @@ const paymentService = {
 
         const orderStatus = isSuccess ? 'PAGO' : 'CANCELADO';
         try {
-            await axios.patch(`${ORDERS_SERVICE_URL}/${payment.orderId}/status`, {
+            await axios.patch(`http://localhost:3003/api/orders/${payment.orderId}/status`, {
                 status: orderStatus,
             });
         } catch (error) {
