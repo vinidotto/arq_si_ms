@@ -129,6 +129,13 @@ services:
       - pagamento-db
     command: sh -c "npx prisma migrate deploy && npx prisma db seed && npm start"
 
+  notificacoes-service:
+    container_name: notificacoes-service
+    build: ./notificacoes
+    restart: always
+    ports:
+      - '3005:3005'
+
   pedidos-service:
     container_name: pedidos-service
     build: ./pedidos
