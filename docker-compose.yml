@@ -42,6 +42,57 @@ services:
     ports:
       - '5435:5432'
 
+  # --- Banco de dados de Pedidos (MongoDB) ---
+  orders-db:
+    image: mongo:6.0
+    container_name: orders-db
+    restart: always
+    volumes:
+      - orders_mongo_data:/data/db
+    ports:
+      - '27017:27017'
+    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet --eval \"db.runCommand({ ping: 1 })\" || mongosh -u admin -p admin --authenticationDatabase admin --quiet --eval \"db.runCommand({ ping: 1 })\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # --- UI para MongoDB ---
+  mongo-express:
+    image: mongo-express
+    container_name: mongo-express
+    restart: always
+    ports:
+      - '8081:8081'
+    environment:
+      ME_CONFIG_MONGODB_SERVER: orders-db
+      ME_CONFIG_MONGODB_PORT: 27017
+      ME_CONFIG_MONGODB_ENABLE_ADMIN: "true"
+      ME_CONFIG_BASICAUTH_USERNAME: admin
+      ME_CONFIG_BASICAUTH_PASSWORD: admin
+    depends_on:
+      - orders-db
+
+  # --- Inicialização do Replica Set ---
+  orders-db-init:
+    image: mongo:6.0
+    depends_on:
+      - orders-db
+    entrypoint: >
+      bash -c '
+        set -e
+        until mongosh --host orders-db:27017 --quiet --eval "db.adminCommand({ ping: 1 })" >/dev/null 2>&1; do
+          echo "Waiting for MongoDB..."
+          sleep 2
+        done
+
+        mongosh --host orders-db:27017 --quiet --eval "try { rs.status() } catch (e) { rs.initiate({_id: \"rs0\", members: [{ _id: 0, host: \"orders-db:27017\" }]}) }"
+        mongosh --host orders-db:27017 --quiet --eval "db.adminCommand({ setDefaultRWConcern: 1, defaultWriteConcern: { w: \"majority\" } })"
+      '
+    restart: "no"
+
   cliente-service:
     container_name: cliente-service
     build: ./cliente
@@ -86,6 +137,8 @@ services:
       - '3003:3003'
     env_file:
       - ./.env
+    depends_on:
+      - orders-db-init
     command: sh -c "npx prisma db push && npm start"
 
   pgadmin:
@@ -109,3 +162,4 @@ volumes:
   produto-data:
   pagamento-data:
   pgadmin_data:
+  orders_mongo_data:
