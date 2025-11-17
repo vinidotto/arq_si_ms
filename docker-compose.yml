@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # --- Serviço de Clientes ---
   cliente-db:
@@ -41,6 +39,24 @@ services:
       - pagamento-data:/var/lib/postgresql/data
     ports:
       - '5435:5432'
+
+  # --- RabbitMQ ---
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: admin
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # --- Banco de dados de Pedidos (MongoDB) ---
   orders-db:
@@ -125,8 +141,10 @@ services:
       - '3004:3004'
     environment:
       DATABASE_URL: "postgresql://user:password@pagamento-db:5432/pagamentodb"
+      RABBITMQ_URL: "amqp://admin:admin@rabbitmq:5672"
     depends_on:
       - pagamento-db
+      - rabbitmq
     command: sh -c "npx prisma migrate deploy && npx prisma db seed && npm start"
 
   notificacoes-service:
@@ -135,6 +153,10 @@ services:
     restart: always
     ports:
       - '3005:3005'
+    environment:
+      RABBITMQ_URL: "amqp://admin:admin@rabbitmq:5672"
+    depends_on:
+      - rabbitmq
 
   pedidos-service:
     container_name: pedidos-service
@@ -170,3 +192,4 @@ volumes:
   pagamento-data:
   pgadmin_data:
   orders_mongo_data:
+  rabbitmq_data:

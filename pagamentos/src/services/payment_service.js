@@ -1,5 +1,6 @@
 const { PrismaClient } = require('@prisma/client');
 const axios = require('axios');
+const { rabbitmqProducer } = require('../messaging/rabbitmq');
 const prisma = new PrismaClient();
 
 const paymentService = {
@@ -90,16 +91,29 @@ const paymentService = {
 
         if (isSuccess) {
             try {
+                // Buscar dados do pedido
                 const orderResponse = await axios.get(`http://pedidos-service:3003/api/orders/${payment.orderId}`);
                 const orderData = orderResponse.data || {};
 
-                await axios.post('http://notificacoes-service:3005/api/notifications/order-paid', {
+                // Buscar dados do cliente
+                let customerName = 'Cliente';
+                if (orderData.userId) {
+                    try {
+                        const customerResponse = await axios.get(`http://cliente-service:3001/api/clientes/${orderData.userId}`);
+                        customerName = customerResponse.data?.name || 'Cliente';
+                    } catch (err) {
+                        console.warn('Não foi possível buscar dados do cliente:', err.message);
+                    }
+                }
+
+                // Publicar mensagem no RabbitMQ
+                await rabbitmqProducer.publishPaymentNotification({
                     orderId: payment.orderId,
-                    userId: orderData.userId,
-                    totalValue: orderData.totalValue,
+                    customerName: customerName,
+                    timestamp: new Date().toISOString()
                 });
-            } catch (notificationError) {
-                console.warn(`Não foi possível enviar a notificação do pedido ${payment.orderId}: ${notificationError.message}`);
+            } catch (error) {
+                console.warn(`Erro ao processar notificação do pedido ${payment.orderId}: ${error.message}`);
             }
         }
 
