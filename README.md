@@ -75,12 +75,7 @@ cd arq_si_ms
 
 ### 2. Inicie os Serviços
 
-#### Opção 1: Script Automatizado (Recomendado)
-```bash
-./restart.sh
-```
-
-#### Opção 2: Docker Compose Manual
+#### Docker Compose Manual
 ```bash
 docker compose up -d
 ```
