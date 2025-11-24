@@ -1,5 +1,6 @@
 const express = require('express');
 const router = require('./routes/routes');
+const { connect, startConsumer } = require('./config/rabbitmq');
 
 const app = express();
 const PORT = process.env.PORT || 3005;
@@ -7,6 +8,9 @@ const PORT = process.env.PORT || 3005;
 app.use(express.json());
 app.use('/api', router);
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`Serviço de notificações rodando na porta ${PORT}`);
+
+  await connect();
+  await startConsumer();
 });

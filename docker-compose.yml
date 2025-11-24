@@ -1,11 +1,12 @@
 version: '3.8'
 
 services:
-  # --- Serviço de Clientes ---
   cliente-db:
     image: postgres:15-alpine
     container_name: cliente-db
     restart: always
+    networks:
+      - microservices-network
     environment:
       POSTGRES_USER: user
       POSTGRES_PASSWORD: password
@@ -14,12 +15,18 @@ services:
       - cliente-data:/var/lib/postgresql/data
     ports:
       - '5433:5432'
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d clientedb"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
-  # --- Serviço de Produtos ---
   produto-db:
     image: postgres:15-alpine
     container_name: produto-db
     restart: always
+    networks:
+      - microservices-network
     environment:
       POSTGRES_USER: user
       POSTGRES_PASSWORD: password
@@ -28,10 +35,18 @@ services:
       - produto-data:/var/lib/postgresql/data
     ports:
       - '5434:5432'
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d produtodb"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   pagamento-db:
     image: postgres:15-alpine
     container_name: pagamento-db
     restart: always
+    networks:
+      - microservices-network
     environment:
       POSTGRES_USER: user
       POSTGRES_PASSWORD: password
@@ -40,12 +55,18 @@ services:
       - pagamento-data:/var/lib/postgresql/data
     ports:
       - '5435:5432'
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d pagamentodb"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
-  # --- Banco de dados de Pedidos (MongoDB) ---
   orders-db:
     image: mongo:6.0
     container_name: orders-db
     restart: always
+    networks:
+      - microservices-network
     volumes:
       - orders_mongo_data:/data/db
     ports:
@@ -58,11 +79,12 @@ services:
       retries: 10
       start_period: 10s
 
-  # --- UI para MongoDB ---
   mongo-express:
     image: mongo-express
     container_name: mongo-express
     restart: always
+    networks:
+      - microservices-network
     ports:
       - '8081:8081'
     environment:
@@ -74,9 +96,10 @@ services:
     depends_on:
       - orders-db
 
-  # --- Inicialização do Replica Set ---
   orders-db-init:
     image: mongo:6.0
+    networks:
+      - microservices-network
     depends_on:
       - orders-db
     entrypoint: >
@@ -96,61 +119,104 @@ services:
     container_name: cliente-service
     build: ./cliente
     restart: always
+    networks:
+      - microservices-network
     ports:
       - '3001:3001'
     environment:
       DATABASE_URL: "postgresql://user:password@cliente-db:5432/clientedb"
     depends_on:
-      - cliente-db
-    command: sh -c "npx prisma migrate deploy && npm start"
+      cliente-db:
+        condition: service_healthy
+    security_opt:
+      - seccomp:unconfined
+      - label:disable
+    command: sh -c "npx prisma migrate deploy && npx prisma db seed && npm start"
 
   produto-service:
     container_name: produto-service
     build: ./produto
     restart: always
+    networks:
+      - microservices-network
     ports:
       - '3002:3002'
     environment:
       DATABASE_URL: "postgresql://user:password@produto-db:5432/produtodb"
     depends_on:
-      - produto-db
-    command: sh -c "npx prisma migrate deploy && npm start"
+      produto-db:
+        condition: service_healthy
+    security_opt:
+      - seccomp:unconfined
+      - label:disable
+    command: sh -c "npx prisma migrate deploy && npx prisma db seed && npm start"
 
   pagamentos-service:
     container_name: pagamentos-service
     build: ./pagamentos
     restart: always
+    networks:
+      - microservices-network
     ports:
       - '3004:3004'
     environment:
       DATABASE_URL: "postgresql://user:password@pagamento-db:5432/pagamentodb"
+      RABBITMQ_URL: "amqp://admin:admin@rabbitmq:5672"
+      KAFKA_BROKERS: "kafka:29092"
     depends_on:
-      - pagamento-db
+      pagamento-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    security_opt:
+      - seccomp:unconfined
+      - label:disable
     command: sh -c "npx prisma migrate deploy && npx prisma db seed && npm start"
 
   notificacoes-service:
     container_name: notificacoes-service
     build: ./notificacoes
     restart: always
+    networks:
+      - microservices-network
     ports:
       - '3005:3005'
+    environment:
+      RABBITMQ_URL: "amqp://admin:admin@rabbitmq:5672"
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
 
   pedidos-service:
     container_name: pedidos-service
     build: ./pedidos
     restart: always
+    networks:
+      - microservices-network
     ports:
       - '3003:3003'
     env_file:
       - ./.env
+    environment:
+      KAFKA_BROKERS: "kafka:29092"
     depends_on:
-      - orders-db-init
-    command: sh -c "npx prisma db push && npm start"
+      orders-db-init:
+        condition: service_completed_successfully
+      kafka:
+        condition: service_started
+    security_opt:
+      - seccomp:unconfined
+      - label:disable
+    command: sh -c "npx prisma db push && npx prisma db seed && npm start"
 
   pgadmin:
     image: dpage/pgadmin4
     container_name: pgadmin4_ecommerce
     restart: always
+    networks:
+      - microservices-network
     environment:
       PGADMIN_DEFAULT_EMAIL: admin@admin.com
       PGADMIN_DEFAULT_PASSWORD: admin
@@ -159,9 +225,82 @@ services:
     volumes:
       - pgadmin_data:/var/lib/pgadmin
     depends_on:
-      - produto-db
-      - cliente-db
-      - pagamento-db
+      cliente-db:
+        condition: service_healthy
+      produto-db:
+        condition: service_healthy
+      pagamento-db:
+        condition: service_healthy
+
+  rabbitmq:
+    image: rabbitmq:3.9-management
+    container_name: rabbitmq
+    networks:
+      - microservices-network
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      - RABBITMQ_DEFAULT_USER=admin
+      - RABBITMQ_DEFAULT_PASS=admin
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: zookeeper
+    networks:
+      - microservices-network
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    healthcheck:
+      test: ["CMD-SHELL", "echo ruok | nc localhost 2181"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka
+    networks:
+      - microservices-network
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui
+    networks:
+      - microservices-network
+    depends_on:
+      - kafka
+      - zookeeper
+    ports:
+      - "8080:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+      DYNAMIC_CONFIG_ENABLED: 'true'
 
 volumes:
   cliente-data:
@@ -169,3 +308,8 @@ volumes:
   pagamento-data:
   pgadmin_data:
   orders_mongo_data:
+  rabbitmq_data:
+
+networks:
+  microservices-network:
+    driver: bridge

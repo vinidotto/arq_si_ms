@@ -9,11 +9,11 @@ datasource db {
 
 model Product {
   id          String   @id @default(uuid())
-  name        String
+  name        String   @unique
   description String?
   price       Float
   stock       Int      @default(0)
-  is_deleted  Boolean  @default(false) 
+  is_deleted  Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

@@ -16,12 +16,14 @@ model TypePayment {
 }
 
 model OrderPayment {
-  id      String        @id @default(uuid())
-  orderId String
-  value   Decimal
-  status  PaymentStatus @default(PENDENTE)
+  id              String        @id @default(uuid())
+  orderId         String
+  userId          String        @default("N/A")
+  value           Decimal
+  status          PaymentStatus @default(PENDENTE)
+  productSnapshots Json         @default("[]")
 
-  typePaymentId String 
+  typePaymentId String
   typePayment   TypePayment @relation(fields: [typePaymentId], references: [id])
 
   createdAt DateTime @default(now())

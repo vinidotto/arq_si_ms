@@ -1,5 +1,6 @@
 const { PrismaClient } = require("@prisma/client");
 const axios = require('axios');
+const { publishOrderCreated } = require('../config/kafka');
 
 const prisma = new PrismaClient();
 
@@ -51,22 +52,24 @@ const orderService = {
       const newOrder = await prisma.order.create({ data: orderToCreate });
 
       try {
+        await publishOrderCreated({
+          id: newOrder.id,
+          userId: newOrder.userId,
+          totalValue: newOrder.totalValue,
+          products: newOrder.products,
+          status: newOrder.status,
+          paymentMethods: paymentMethods
+        });
 
-        const paymentCreationPromises = paymentMethods.map(method =>
-          axios.post("http://pagamentos-service:3004/api/payments", {
-            orderId: newOrder.id,
-            value: calculatedTotalValue,
-            typePaymentId: method.typeId
-          })
-        );
-        await Promise.all(paymentCreationPromises);
-      } catch (paymentError) {
+        console.log(`Evento de criação de pedido publicado no Kafka para o pedido ${newOrder.id}`);
+      } catch (kafkaError) {
+        console.error('Erro ao publicar no Kafka:', kafkaError);
 
         await prisma.order.delete({
           where: { id: newOrder.id }
         });
 
-        throw new Error(`Houve um erro ao registrar a intenção de pagamento: ${paymentError.message}`);
+        throw new Error(`Houve um erro ao publicar o evento de criação do pedido: ${kafkaError.message}`);
       }
 
       return newOrder;

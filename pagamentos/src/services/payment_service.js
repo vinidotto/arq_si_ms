@@ -1,5 +1,6 @@
 const { PrismaClient } = require('@prisma/client');
 const axios = require('axios');
+const { publishToQueue } = require('../config/rabbitmq');
 const prisma = new PrismaClient();
 
 const paymentService = {
@@ -27,7 +28,7 @@ const paymentService = {
     async createPayment(data) {
         console.log('DADOS RECEBIDOS NA CREATE PAYMENT:', data);
 
-        const { orderId, value, typePaymentId } = data;
+        const { orderId, userId, value, typePaymentId, productSnapshots } = data;
         if (!orderId || !value || !typePaymentId) {
             throw new Error('orderId, value e typePaymentId são obrigatórios.');
         }
@@ -40,8 +41,10 @@ const paymentService = {
         return prisma.orderPayment.create({
             data: {
                 orderId,
+                userId: userId || 'N/A',
                 value,
                 typePaymentId,
+                productSnapshots: productSnapshots || [],
                 status: 'PENDENTE',
             },
         });
@@ -93,13 +96,15 @@ const paymentService = {
                 const orderResponse = await axios.get(`http://pedidos-service:3003/api/orders/${payment.orderId}`);
                 const orderData = orderResponse.data || {};
 
-                await axios.post('http://notificacoes-service:3005/api/notifications/order-paid', {
+                await publishToQueue({
                     orderId: payment.orderId,
                     userId: orderData.userId,
                     totalValue: orderData.totalValue,
+                    paymentId: updatedPayment.id,
+                    processedAt: new Date().toISOString()
                 });
             } catch (notificationError) {
-                console.warn(`Não foi possível enviar a notificação do pedido ${payment.orderId}: ${notificationError.message}`);
+                console.warn(`Não foi possível publicar mensagem na fila: ${notificationError.message}`);
             }
         }
 
