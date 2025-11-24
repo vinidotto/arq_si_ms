@@ -12,6 +12,11 @@ services:
       - cliente-data:/var/lib/postgresql/data
     ports:
       - '5433:5432'
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d clientedb"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   # --- Serviço de Produtos ---
   produto-db:
@@ -26,7 +31,13 @@ services:
       - produto-data:/var/lib/postgresql/data
     ports:
       - '5434:5432'
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d produtodb"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
+  # --- Serviço de Pagamentos ---
   pagamento-db:
     image: postgres:15-alpine
     container_name: pagamento-db
@@ -39,6 +50,11 @@ services:
       - pagamento-data:/var/lib/postgresql/data
     ports:
       - '5435:5432'
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d pagamentodb"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   # --- RabbitMQ ---
   rabbitmq:
@@ -53,7 +69,7 @@ services:
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     healthcheck:
-      test: rabbitmq-diagnostics -q ping
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -95,7 +111,8 @@ services:
   orders-db-init:
     image: mongo:6.0
     depends_on:
-      - orders-db
+      orders-db:
+        condition: service_healthy
     entrypoint: >
       bash -c '
         set -e
@@ -104,10 +121,15 @@ services:
           sleep 2
         done
 
-        mongosh --host orders-db:27017 --quiet --eval "try { rs.status() } catch (e) { rs.initiate({_id: \"rs0\", members: [{ _id: 0, host: \"orders-db:27017\" }]}) }"
-        mongosh --host orders-db:27017 --quiet --eval "db.adminCommand({ setDefaultRWConcern: 1, defaultWriteConcern: { w: \"majority\" } })"
+        mongosh --host orders-db:27017 --quiet --eval "
+          try { rs.status() } catch (e) {
+            rs.initiate({_id: \"rs0\", members: [{ _id: 0, host: \"orders-db:27017\" }]})
+          }
+        "
       '
     restart: "no"
+
+  # --- Services ---
 
   cliente-service:
     container_name: cliente-service
@@ -118,8 +140,9 @@ services:
     environment:
       DATABASE_URL: "postgresql://user:password@cliente-db:5432/clientedb"
     depends_on:
-      - cliente-db
-    command: sh -c "npx prisma migrate deploy && npm start"
+      cliente-db:
+        condition: service_healthy
+    command: sh -c "npx prisma migrate deploy && npx prisma db seed && npm start"
 
   produto-service:
     container_name: produto-service
@@ -130,8 +153,9 @@ services:
     environment:
       DATABASE_URL: "postgresql://user:password@produto-db:5432/produtodb"
     depends_on:
-      - produto-db
-    command: sh -c "npx prisma migrate deploy && npm start"
+      produto-db:
+        condition: service_healthy
+    command: sh -c "npx prisma migrate deploy && npx prisma db seed && npm start"
 
   pagamentos-service:
     container_name: pagamentos-service
@@ -143,8 +167,10 @@ services:
       DATABASE_URL: "postgresql://user:password@pagamento-db:5432/pagamentodb"
       RABBITMQ_URL: "amqp://admin:admin@rabbitmq:5672"
     depends_on:
-      - pagamento-db
-      - rabbitmq
+      pagamento-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     command: sh -c "npx prisma migrate deploy && npx prisma db seed && npm start"
 
   notificacoes-service:
@@ -156,7 +182,8 @@ services:
     environment:
       RABBITMQ_URL: "amqp://admin:admin@rabbitmq:5672"
     depends_on:
-      - rabbitmq
+      rabbitmq:
+        condition: service_healthy
 
   pedidos-service:
     container_name: pedidos-service
@@ -167,7 +194,8 @@ services:
     env_file:
       - ./.env
     depends_on:
-      - orders-db-init
+      orders-db-init:
+        condition: service_completed_successfully
     command: sh -c "npx prisma db push && npm start"
 
   pgadmin:
@@ -182,10 +210,14 @@ services:
     volumes:
       - pgadmin_data:/var/lib/pgadmin
     depends_on:
-      - produto-db
-      - cliente-db
-      - pagamento-db
+      cliente-db:
+        condition: service_healthy
+      produto-db:
+        condition: service_healthy
+      pagamento-db:
+        condition: service_healthy
 
+  # --- Kafka ---
   kafka:
     image: confluentinc/cp-kafka:7.5.0
     container_name: kafka
@@ -225,6 +257,11 @@ services:
       ZOOKEEPER_TICK_TIME: 2000
     ports:
       - "2181:2181"
+    healthcheck:
+      test: ["CMD-SHELL", "echo ruok | nc localhost 2181"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
 volumes:
   cliente-data:
