@@ -142,6 +142,20 @@ const orderService = {
       data: {
         status: status,
       },
+    }).then(async (updatedOrder) => {
+      // Invalidar cache após atualizar status
+      try {
+        const { getRedisClient } = require('../middleware/redisCache');
+        const redisClient = getRedisClient();
+        if (redisClient) {
+          const cacheKey = `cache:/api/orders/${id}`;
+          await redisClient.del(cacheKey);
+          console.log(`✓ Cache invalidado: ${cacheKey}`);
+        }
+      } catch (err) {
+        console.warn('Aviso: não foi possível invalidar cache:', err.message);
+      }
+      return updatedOrder;
     });
   },
 };

@@ -82,11 +82,12 @@ const paymentService = {
 
         const orderStatus = isSuccess ? 'PAGO' : 'CANCELADO';
         try {
-            await axios.patch(`http://pedidos-service:3003/api/orders/${payment.orderId}/status`, {
+            const patchResponse = await axios.patch(`http://pedidos-service:3003/api/orders/${payment.orderId}/status`, {
                 status: orderStatus,
             });
+            console.log(`✓ Status do pedido ${payment.orderId} atualizado para ${orderStatus}:`, patchResponse.data);
         } catch (error) {
-            console.error(`Falha ao atualizar o status do pedido ${payment.orderId}:`, error.message);
+            console.error(`✗ Falha ao atualizar o status do pedido ${payment.orderId}:`, error.message);
         }
 
         if (isSuccess) {
