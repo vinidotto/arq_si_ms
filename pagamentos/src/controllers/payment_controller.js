@@ -1,8 +1,12 @@
 const { paymentService } = require('../services/payment_service.js');
+const { invalidateResourceCache } = require('../middlewares/cache');
 
 async function createTypePayment(req, res) {
     try {
         const typePayment = await paymentService.createTypePayment(req.body);
+
+        await invalidateResourceCache("/api/type-payments");
+
         res.status(201).json(typePayment);
     } catch (error) {
         res.status(400).json({ message: error.message });
