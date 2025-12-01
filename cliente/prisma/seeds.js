@@ -17,7 +17,8 @@ async function main() {
         name: "Charlie Brown",
         email: "charlie@example.com",
       }
-    ]
+    ],
+    skipDuplicates: true
   });
 
   console.log("Seed executed successfully!");

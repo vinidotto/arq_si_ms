@@ -46,6 +46,13 @@ Sistema de e-commerce modular e escalável que implementa:
 - **PgAdmin 4** - Interface para PostgreSQL
 - **Mongo Express** - Interface para MongoDB
 - **RabbitMQ Management** - Interface para RabbitMQ
+- **Konga** - Interface de Gerenciamento do KONG
+- **KONG API Gateway 3.4** - Rate limiting e roteamento centralizado
+
+### API Gateway
+- **KONG 3.4** - Gateway unificado para todos os serviços
+- **Rate Limiting** - 10 requisições/minuto por padrão
+- **Redis Cache** - TTLs configuráveis por rota
 
 ---
 
@@ -86,6 +93,48 @@ docker compose ps
 ```
 
 Todos os containers devem estar com status `running` ou `healthy`.
+
+---
+
+## 🌐 Acessar os Serviços
+
+### API Gateway (KONG)
+- **URL:** http://localhost:9000
+- **Admin API:** http://localhost:8001
+- **Porta:** 9000 (proxy), 8001 (admin)
+
+### Gerenciamento KONG (Konga)
+- **URL:** http://localhost:1337
+- **Conexão inicial:**
+  - Name: `Local Kong`
+  - Kong Admin URL: `http://kong:8001`
+  - Clique em **CREATE CONNECTION**
+- Depois poderá acessar o Dashboard com todos os serviços e rotas já configurados
+
+### Bancos de Dados & Ferramentas
+- **PgAdmin:** http://localhost:5050 (user: admin@admin.com / password: admin)
+- **Mongo Express:** http://localhost:8081
+- **RabbitMQ Management:** http://localhost:15672 (user: admin / password: admin)
+
+### Endpoints dos Serviços (via KONG)
+```bash
+# Clientes
+curl http://localhost:9000/api/clients
+curl http://localhost:9000/api/clientes
+
+# Produtos
+curl http://localhost:9000/api/products
+curl http://localhost:9000/api/produtos
+
+# Pedidos
+curl http://localhost:9000/api/orders
+curl http://localhost:9000/api/pedidos
+
+# Pagamentos
+curl http://localhost:9000/api/payments
+curl http://localhost:9000/api/pagamentos
+curl http://localhost:9000/api/type-payments
+```
 
 ---
 
