@@ -1,8 +1,12 @@
 const { produtoService } = require("../services/produto_service.js");
+const { invalidateResourceCache } = require("../middlewares/cache");
 
 async function createProduct(req, res) {
   try {
     const product = await produtoService.create(req.body);
+
+    await invalidateResourceCache("/api/products");
+
     return res.status(201).json(product);
   } catch (error) {
     return res.status(400).json({ message: error.message });
@@ -36,6 +40,10 @@ async function updateProduct(req, res) {
       req.params.id,
       req.body
     );
+
+    await invalidateResourceCache(`/api/products/${req.params.id}`);
+    await invalidateResourceCache("/api/products");
+
     return res.json(product);
   } catch (error) {
     return res.status(400).json({ message: error.message });
@@ -45,6 +53,10 @@ async function updateProduct(req, res) {
 async function deleteProduct(req, res) {
   try {
     await produtoService.softDelete(req.params.id);
+
+    await invalidateResourceCache(`/api/products/${req.params.id}`);
+    await invalidateResourceCache("/api/products");
+
     return res.status(204).send();
   } catch (error) {
     return res.status(400).json({ message: error.message });
@@ -58,6 +70,10 @@ async function updateStock(req, res) {
       req.params.id,
       quantity
     );
+
+    await invalidateResourceCache(`/api/products/${req.params.id}`);
+    await invalidateResourceCache("/api/products");
+
     return res.json(product);
   } catch (error) {
     return res.status(400).json({ message: error.message });

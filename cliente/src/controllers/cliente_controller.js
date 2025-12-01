@@ -1,9 +1,13 @@
 const { clientService } = require("../services/cliente_service");
+const { invalidateResourceCache } = require("../middlewares/cache");
 
 class ClienteController {
   static async create(req, res) {
     try {
       const client = await clientService.create(req.body);
+
+      await invalidateResourceCache("/api/users");
+
       return res.status(201).json(client);
     } catch (error) {
       return res.status(400).json({ message: error.message });
@@ -37,6 +41,10 @@ class ClienteController {
         req.params.id,
         req.body
       );
+
+      await invalidateResourceCache(`/api/users/${req.params.id}`);
+      await invalidateResourceCache("/api/users");
+
       return res.json(client);
     } catch (error) {
       return res.status(400).json({ message: error.message });
@@ -46,6 +54,10 @@ class ClienteController {
   static async delete(req, res) {
     try {
       await clientService.delete(req.params.id);
+
+      await invalidateResourceCache(`/api/users/${req.params.id}`);
+      await invalidateResourceCache("/api/users");
+
       return res.status(204).send();
     } catch (error) {
       return res.status(400).json({ message: error.message });

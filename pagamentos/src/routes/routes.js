@@ -1,16 +1,17 @@
 const { Router } = require('express');
-const { 
+const {
   createTypePayment,
   getAllTypePayments,
   createPayment,
   processPayment,
-  getPaymentsByOrderId 
+  getPaymentsByOrderId
 } = require('../controllers/payment_controller.js');
+const { cacheMiddleware } = require('../middlewares/cache');
 
 const router = Router();
 
+router.get('/type-payments', cacheMiddleware(null), getAllTypePayments);
 router.post('/type-payments', createTypePayment);
-router.get('/type-payments', getAllTypePayments);
 
 router.post('/payments', createPayment);
 router.patch('/payments/:id/process', processPayment);
