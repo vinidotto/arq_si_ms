@@ -12,11 +12,8 @@ Subir os serviços:
 Existem dois arquivos para testar a API:
 
 ### 1. Testes Manuais (`curls.sh`)
-Execute os comandos de teste um por vez do arquivo `curls.sh`, copiando os *IDs* retornados para substituir nos próximos comandos.
-- Dar permissão de execução: `chmod +x auto_curls.sh`
-
-### 2. Testes Automatizados (`auto_curls.sh`)
 Script que roda automaticamente todos os testes com formatação JSON usando `jq`.
+- Dar permissão de execução: `chmod +x auto_curls.sh`
 
 **Pré-requisitos:**
 - Instalar `jq`: `sudo apt install jq` (Ubuntu) | `brew install jq` (macOS) | `sudo dnf install jq` (Debian) 
@@ -24,12 +21,13 @@ Script que roda automaticamente todos os testes com formatação JSON usando `jq
 
 **Executar:**
 ```bash
-./auto_curls.sh
+./curls.sh
 ```
 
 ## API Gateway (Kong)
 
 O Kong está configurado como API Gateway na porta `8000`. O Konga é a interface de administração do Kong, acessível em `http://localhost:1337`.
+- Os serviços, rotas e plugins já são configurados ao subir o *docker*
 
 ### Exemplo: Configurar Serviço e Rota para Usuários
 
